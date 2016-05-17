@@ -67,13 +67,13 @@ struct shared_vmport_iopage {
 typedef struct shared_vmport_iopage shared_vmport_iopage_t;
 #endif
 
-static inline uint32_t xen_vcpu_eport(shared_iopage_t *shared_page, int i)
+static inline uint32_t xen_vcpu_eport(shared_iopage_t **shared_page, int i)
 {
-    return shared_page->vcpu_ioreq[i].vp_eport;
+    return shared_page[i/128]->vcpu_ioreq[i%128].vp_eport;
 }
-static inline ioreq_t *xen_vcpu_ioreq(shared_iopage_t *shared_page, int vcpu)
+static inline ioreq_t *xen_vcpu_ioreq(shared_iopage_t **shared_page, int vcpu)
 {
-    return &shared_page->vcpu_ioreq[vcpu];
+    return &shared_page[vcpu/128]->vcpu_ioreq[vcpu%128];
 }
 
 #define BUFFER_IO_MAX_DELAY  100
@@ -87,9 +87,10 @@ typedef struct XenPhysmap {
     QLIST_ENTRY(XenPhysmap) list;
 } XenPhysmap;
 
+#define SHARED_IOPAGE_NUM 2
 typedef struct XenIOState {
     ioservid_t ioservid;
-    shared_iopage_t *shared_page;
+    shared_iopage_t *shared_page[SHARED_IOPAGE_NUM];
     shared_vmport_iopage_t *shared_vmport_page;
     buffered_iopage_t *buffered_io_page;
     QEMUTimer *buffered_io_timer;
@@ -1256,13 +1257,14 @@ void xen_hvm_init(PCMachineState *pcms, MemoryRegion **ram_memory)
     DPRINTF("buffered io page at pfn %lx\n", bufioreq_pfn);
     DPRINTF("buffered io evtchn is %x\n", bufioreq_evtchn);
 
-    state->shared_page = xenforeignmemory_map(xen_fmem, xen_domid,
-                                              PROT_READ|PROT_WRITE,
-                                              1, &ioreq_pfn, NULL);
-    if (state->shared_page == NULL) {
-        error_report("map shared IO page returned error %d handle=%p",
+    for (i = 0; i < SHARED_IOPAGE_NUM; i++) {
+        state->shared_page[i] = xenforeignmemory_map(xen_fmem, xen_domid,
+                            PROT_READ|PROT_WRITE, 1, &ioreq_pfn, NULL);
+        if (state->shared_page[i] == NULL) {
+            error_report("map shared IO page returned error %d handle=%p",
                      errno, xen_xc);
-        goto err;
+        }
+        ioreq_pfn++;
     }
 
     rc = xen_get_vmport_regs_pfn(xen_xc, xen_domid, &ioreq_pfn);
