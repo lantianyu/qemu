@@ -87,7 +87,7 @@ typedef struct XenPhysmap {
     QLIST_ENTRY(XenPhysmap) list;
 } XenPhysmap;
 
-#define SHARED_IOPAGE_NUM 2
+#define SHARED_IOPAGE_NUM 4
 typedef struct XenIOState {
     ioservid_t ioservid;
     shared_iopage_t *shared_page[SHARED_IOPAGE_NUM];
