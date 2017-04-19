@@ -1271,6 +1271,7 @@ void pc_machine_done(Notifier *notifier, void *data)
         fw_cfg_modify_i16(pcms->fw_cfg, FW_CFG_NB_CPUS, pcms->boot_cpus);
     }
 
+    /*
     if (pcms->apic_id_limit > 255) {
         IntelIOMMUState *iommu = INTEL_IOMMU_DEVICE(x86_iommu_get_default());
 
@@ -1283,6 +1284,7 @@ void pc_machine_done(Notifier *notifier, void *data)
             exit(EXIT_FAILURE);
         }
     }
+    */
 }
 
 void pc_guest_info_init(PCMachineState *pcms)
