@@ -1649,8 +1649,58 @@ void vfio_vga_quirk_finalize(VFIOPCIDevice *vdev)
     }
 }
 
+static uint64_t vfio_nvme_quirk_read(void *opaque,
+                                     hwaddr addr, unsigned size)
+{
+    VFIOPCIDevice *vdev = opaque;
+
+    return vfio_region_read(&vdev->bars[0].region, addr, size);
+}
+
+static void vfio_nvme_quirk_write(void *opaque, hwaddr addr,
+                                       uint64_t data, unsigned size)
+{
+    VFIOPCIDevice *vdev = opaque;
+
+    printf("%s: addr 0x%x data 0x%lx \n", __func__, (unsigned int)addr, data);
+    vfio_region_write(&vdev->bars[0].region, addr, data, size);
+    if (addr == 0x0014)
+        sleep(3);
+}
+
+static const MemoryRegionOps vfio_nvme_quirk = {
+    .read = vfio_nvme_quirk_read,
+    .write = vfio_nvme_quirk_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+
+static void vfio_probe_nvme_quirk(VFIOPCIDevice *vdev, int nr)
+{
+    VFIOQuirk *quirk;
+
+    if (!vfio_pci_is(vdev, PCI_VENDOR_ID_INTEL, PCI_ANY_ID)
+            || nr != 0) {
+        return;
+    }
+
+    printf("%s: %d \n", __func__, __LINE__);
+
+    quirk = g_malloc0(sizeof(*quirk));
+    quirk->mem = g_new0(MemoryRegion, 1);
+    quirk->nr_mem = 1;
+
+    memory_region_init_io(&quirk->mem[0], OBJECT(vdev),
+                          &vfio_nvme_quirk, vdev,
+                          "vfio-nvme-quirk", 0x4);
+    memory_region_add_subregion_overlap(vdev->bars[0].region.mem,
+                                        0x0014,
+                                        &quirk->mem[0], 0x1);
+
+}
+
 void vfio_bar_quirk_setup(VFIOPCIDevice *vdev, int nr)
 {
+    vfio_probe_nvme_quirk(vdev, nr);
     vfio_probe_ati_bar4_quirk(vdev, nr);
     vfio_probe_ati_bar2_quirk(vdev, nr);
     vfio_probe_nvidia_bar5_quirk(vdev, nr);
